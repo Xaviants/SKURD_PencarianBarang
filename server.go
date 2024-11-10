@@ -21,6 +21,7 @@ var items = []Item{
 	{ID: 1, Name: "Laptop", Price: 12000000},
 	{ID: 2, Name: "Smartphone", Price: 8000000},
 	{ID: 3, Name: "Headphones", Price: 200000},
+	{ID: 4, Name: "PS 4", Price: 2500000},
 }
 
 // Log aktivitas (menggunakan linked list)
