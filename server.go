@@ -2,11 +2,12 @@ package main
 
 import (
 	"container/list"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/gin-gonic/gin"
 )
 
 // Item struct untuk menyimpan data barang
@@ -39,8 +40,8 @@ func init() {
 }
 
 // Fungsi pencarian barang (GET)
-func searchItems(w http.ResponseWriter, r *http.Request) {
-	query := strings.ToLower(r.URL.Query().Get("query"))
+func searchItems(c *gin.Context) {
+	query := strings.ToLower(c.Query("query"))
 	var results []Item
 	for _, item := range items {
 		if strings.Contains(strings.ToLower(item.Name), query) {
@@ -48,29 +49,29 @@ func searchItems(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	activityLog.PushBack(fmt.Sprintf("Search query: %s", query))
-	jsonResponse(w, results)
+	c.JSON(http.StatusOK, results)
 }
 
 // Fungsi menambahkan barang baru (POST)
-func addItem(w http.ResponseWriter, r *http.Request) {
+func addItem(c *gin.Context) {
 	var newItem Item
-	if err := json.NewDecoder(r.Body).Decode(&newItem); err != nil {
-		http.Error(w, "Invalid input", http.StatusBadRequest)
+	if err := c.ShouldBindJSON(&newItem); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
 		return
 	}
 	newItem.ID = len(items) + 1
 	items = append(items, newItem)
 	itemIndex[newItem.Name] = newItem.ID
 	activityLog.PushBack(fmt.Sprintf("Added item: %s", newItem.Name))
-	jsonResponse(w, newItem)
+	c.JSON(http.StatusCreated, newItem)
 }
 
 // Fungsi menghapus barang berdasarkan ID (DELETE)
-func deleteItem(w http.ResponseWriter, r *http.Request) {
-	idStr := r.URL.Query().Get("id")
+func deleteItem(c *gin.Context) {
+	idStr := c.Query("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
 		return
 	}
 	var found bool
@@ -84,42 +85,34 @@ func deleteItem(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if !found {
-		http.Error(w, "Item not found", http.StatusNotFound)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Item not found"})
 		return
 	}
-	w.WriteHeader(http.StatusNoContent)
+	c.Status(http.StatusNoContent)
 }
 
 // Fungsi melihat log aktivitas (GET)
-func getActivityLog(w http.ResponseWriter, r *http.Request) {
+func getActivityLog(c *gin.Context) {
 	var logs []string
 	for e := activityLog.Front(); e != nil; e = e.Next() {
 		logs = append(logs, e.Value.(string))
 	}
-	jsonResponse(w, logs)
+	c.JSON(http.StatusOK, logs)
 }
 
-// Fungsi respons JSON
-func jsonResponse(w http.ResponseWriter, data interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(data)
-}
-
-// Fungsi utama menjalankan server
 func main() {
-	http.HandleFunc("/items/search", searchItems)
-	http.HandleFunc("/items", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodPost:
-			addItem(w, r)
-		case http.MethodDelete:
-			deleteItem(w, r)
-		default:
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		}
-	})
-	http.HandleFunc("/activity-log", getActivityLog)
+	router := gin.Default()
+
+	// Rute untuk pencarian barang
+	router.GET("/items/search", searchItems)
+
+	// Rute untuk menambahkan dan menghapus barang
+	router.POST("/items", addItem)
+	router.DELETE("/items", deleteItem)
+
+	// Rute untuk melihat log aktivitas
+	router.GET("/activity-log", getActivityLog)
 
 	fmt.Println("Server berjalan di http://localhost:8080")
-	http.ListenAndServe(":8080", nil)
+	router.Run(":8080")
 }
