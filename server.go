@@ -48,7 +48,7 @@ func searchItems(c *gin.Context) {
 			results = append(results, item)
 		}
 	}
-	activityLog.PushBack(fmt.Sprintf("Search query: %s", query))
+	activityLog.PushBack(fmt.Sprintf("Searched item: %s", query))
 	c.JSON(http.StatusOK, results)
 }
 
