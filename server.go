@@ -29,6 +29,20 @@ var items = []Item{
 // Log aktivitas (menggunakan linked list)
 var activityLog = list.New()
 
+// Barang terbaru (menggunakan queue dengan linked list)
+var recentItemsQueue = list.New()
+
+// Maksimum barang dalam queue
+const maxRecentItems = 5
+
+// Fungsi menambahkan item ke queue
+func enqueueRecentItem(item Item) {
+	if recentItemsQueue.Len() >= maxRecentItems {
+		recentItemsQueue.Remove(recentItemsQueue.Front()) // Hapus elemen terdepan jika penuh
+	}
+	recentItemsQueue.PushBack(item)
+}
+
 // Pencarian cepat menggunakan map
 var itemIndex = map[string]int{}
 
@@ -62,6 +76,7 @@ func addItem(c *gin.Context) {
 	newItem.ID = len(items) + 1
 	items = append(items, newItem)
 	itemIndex[newItem.Name] = newItem.ID
+	enqueueRecentItem(newItem) // Tambahkan ke queue barang terbaru
 	activityLog.PushBack(fmt.Sprintf("Added item: %s", newItem.Name))
 	c.JSON(http.StatusCreated, newItem)
 }
@@ -91,6 +106,18 @@ func deleteItem(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+// Fungsi melihat barang terbaru (GET)
+func getRecentItems(c *gin.Context) {
+	var recentItems []Item
+	for e := recentItemsQueue.Front(); e != nil; e = e.Next() {
+		recentItems = append(recentItems, e.Value.(Item))
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"status": "success",
+		"data":   recentItems,
+	})
+}
+
 // Fungsi melihat log aktivitas (GET)
 func getActivityLog(c *gin.Context) {
 	var logs []string
@@ -106,9 +133,14 @@ func main() {
 	// Rute untuk pencarian barang
 	router.GET("/items/search", searchItems)
 
-	// Rute untuk menambahkan dan menghapus barang
+	// Rute untuk menambahkan barang baru
 	router.POST("/items", addItem)
+
+	// Rute untuk menghapus barang
 	router.DELETE("/items", deleteItem)
+
+	// Rute untuk melihat barang terbaru
+	router.GET("/items/recent", getRecentItems)
 
 	// Rute untuk melihat log aktivitas
 	router.GET("/activity-log", getActivityLog)
