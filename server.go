@@ -73,17 +73,25 @@ func addItems(c *gin.Context) {
         c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
         return
     }
-    for _, item := range newItems {
-        item.ID = len(items) + 1
-        items = append(items, item)
-        enqueueRecentItem(item)
-        activityLog.PushBack(fmt.Sprintf("Added item: %s", item.Name))
+
+    // Mulai ID baru dari panjang slice items + 1
+    nextID := len(items) + 1
+
+    for i := range newItems {
+        newItems[i].ID = nextID
+        items = append(items, newItems[i])
+        itemIndex[newItems[i].Name] = newItems[i].ID
+        enqueueRecentItem(newItems[i])
+        activityLog.PushBack(fmt.Sprintf("Added item: %s", newItems[i].Name))
+        nextID++ // Increment ID untuk barang berikutnya
     }
+
     c.JSON(http.StatusCreated, gin.H{
         "message": "Items added successfully",
         "data":    newItems,
     })
 }
+
 
 
 // Fungsi menghapus barang berdasarkan ID (DELETE)
