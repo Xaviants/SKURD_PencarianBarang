@@ -67,19 +67,24 @@ func searchItems(c *gin.Context) {
 }
 
 // Fungsi menambahkan barang baru (POST)
-func addItem(c *gin.Context) {
-	var newItem Item
-	if err := c.ShouldBindJSON(&newItem); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
-		return
-	}
-	newItem.ID = len(items) + 1
-	items = append(items, newItem)
-	itemIndex[newItem.Name] = newItem.ID
-	enqueueRecentItem(newItem) // Tambahkan ke queue barang terbaru
-	activityLog.PushBack(fmt.Sprintf("Added item: %s", newItem.Name))
-	c.JSON(http.StatusCreated, newItem)
+func addItems(c *gin.Context) {
+    var newItems []Item
+    if err := c.ShouldBindJSON(&newItems); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+        return
+    }
+    for _, item := range newItems {
+        item.ID = len(items) + 1
+        items = append(items, item)
+        enqueueRecentItem(item)
+        activityLog.PushBack(fmt.Sprintf("Added item: %s", item.Name))
+    }
+    c.JSON(http.StatusCreated, gin.H{
+        "message": "Items added successfully",
+        "data":    newItems,
+    })
 }
+
 
 // Fungsi menghapus barang berdasarkan ID (DELETE)
 func deleteItem(c *gin.Context) {
@@ -134,7 +139,7 @@ func main() {
 	router.GET("/items/search", searchItems)
 
 	// Rute untuk menambahkan barang baru
-	router.POST("/items", addItem)
+	router.POST("/items", addItems)
 
 	// Rute untuk menghapus barang
 	router.DELETE("/items", deleteItem)
