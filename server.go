@@ -67,6 +67,15 @@ func searchItems(c *gin.Context) {
 	var results []Item
 	db.Where("LOWER(name) LIKE ?", "%"+query+"%").Find(&results)
 
+	if len(results) == 0 {
+		c.JSON(http.StatusNotFound, gin.H{
+			"query": query,
+			"status": "error",
+			"message": "Item cannot be found",
+		})
+		return
+	}
+
 	activityLog.PushBack(fmt.Sprintf("Searched item: %s", query))
 	c.JSON(http.StatusOK, gin.H{
 		"query":  query,
