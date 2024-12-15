@@ -55,7 +55,11 @@ func init() {
 
 // Fungsi pencarian barang (GET)
 func searchItems(c *gin.Context) {
-	query := strings.ToLower(c.Query("query"))
+	query := strings.TrimSpace(strings.ToLower(c.Query("query")))         // added TrimSpace if theres a space during input the query example " Laptop"
+	if strings.ContainsAny(query, "!@#$%^&*()<>/?;:'\"[]{}\\|+=-_`~,.") { // debugging error
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid characters in query"})
+		return
+	}
 	var results []Item
 	for _, item := range items {
 		if strings.Contains(strings.ToLower(item.Name), query) {
@@ -63,7 +67,41 @@ func searchItems(c *gin.Context) {
 		}
 	}
 	activityLog.PushBack(fmt.Sprintf("Searched item: %s", query))
-	c.JSON(http.StatusOK, results)
+	// c.JSON(http.StatusOK, results)
+	c.JSON(http.StatusOK, gin.H{ // added status and query after searching or enter looking for the item name
+		"query":  query,
+		"status": "success",
+		"data":   results,
+	})
+}
+
+func searchItemsByPriceRange(c *gin.Context) {
+	// Ambil parameter minPrice dan maxPrice dari query string
+	minPrice, errMin := strconv.Atoi(c.DefaultQuery("minPrice", "0"))
+	maxPrice, errMax := strconv.Atoi(c.DefaultQuery("maxPrice", "0"))
+
+	// Validasi input minPrice dan maxPrice
+	if errMin != nil || errMax != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid price range"})
+		return
+	}
+
+	// Filter barang berdasarkan rentang harga
+	var results []Item
+	for _, item := range items {
+		if item.Price >= minPrice && (maxPrice == 0 || item.Price <= maxPrice) {
+			results = append(results, item)
+		}
+	}
+
+	// Catat aktivitas pencarian ke activity log
+	activityLog.PushBack(fmt.Sprintf("Searched items in price range: %d-%d", minPrice, maxPrice))
+
+	// Kembalikan hasil pencarian ke pengguna
+	c.JSON(http.StatusOK, gin.H{
+		"status": "success",
+		"data":   results,
+	})
 }
 
 // Fungsi menambahkan barang baru (POST)
@@ -79,13 +117,13 @@ func addItems(c *gin.Context) {
 
 	for i := range newItems {
 		if _, exists := itemIndex[strings.ToLower(newItems[i].Name)]; exists {
-			c.JSON(http.StatusConflict, gin.H{"error": "Item with this name already exists"})
+			c.JSON(http.StatusConflict, gin.H{"error": "Item with this name already exists"}) // error handling if theres a duplicate data
 			return
 		}
 
 		newItems[i].ID = nextID
 		items = append(items, newItems[i])
-		itemIndex[strings.ToLower(newItems[i].Name)] = newItems[i].ID
+		itemIndex[strings.ToLower(newItems[i].Name)] = newItems[i].ID // added string.ToLower
 		enqueueRecentItem(newItems[i])
 		activityLog.PushBack(fmt.Sprintf("Added item: %s", newItems[i].Name))
 		nextID++ // Increment ID untuk barang berikutnya
@@ -100,7 +138,7 @@ func addItems(c *gin.Context) {
 // Fungsi menghapus barang berdasarkan ID (DELETE)
 func deleteItem(c *gin.Context) {
 	idStr := c.Query("id")
-	id, err := strconv.Atoi(idStr)
+	id, err := strconv.Atoi(idStr) //Atoi parse convert to int
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
 		return
@@ -119,15 +157,29 @@ func deleteItem(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Item not found"})
 		return
 	}
-	c.Status(http.StatusNoContent)
+	// c.Status(http.StatusNoContent)
+	c.JSON(http.StatusOK, gin.H{
+		"message":    "Item deleted successfully",
+		"deleted_id": id,
+	})
 }
 
 // Fungsi melihat barang terbaru (GET)
 func getRecentItems(c *gin.Context) {
 	var recentItems []Item
+
 	for e := recentItemsQueue.Front(); e != nil; e = e.Next() {
-		recentItems = append(recentItems, e.Value.(Item))
+		item, ok := e.Value.(Item)
+		if !ok {
+			// Respons error jika tipe data salah
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid item in queue"})
+			return
+		}
+		recentItems = append(recentItems, item)
+		// recentItems = append(recentItems, e.Value.(Item)) // error jika dijalankan karena beda tipe)
 	}
+
+	// Kirimkan respons dengan data hasil iterasi
 	c.JSON(http.StatusOK, gin.H{
 		"status": "success",
 		"data":   recentItems,
@@ -148,6 +200,9 @@ func main() {
 
 	// Rute untuk pencarian barang
 	router.GET("/items/search", searchItems)
+
+	// Rute untuk pencarian berdasarkan rentang harga
+	router.GET("/items/search/price", searchItemsByPriceRange)
 
 	// Rute untuk menambahkan barang baru
 	router.POST("/items", addItems)
