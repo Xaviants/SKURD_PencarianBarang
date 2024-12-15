@@ -3,28 +3,25 @@ package main
 import (
 	"container/list"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
 )
 
-// Item struct untuk menyimpan data barang
+// Struct untuk barang
 type Item struct {
-	ID    int    `json:"id"`
-	Name  string `json:"name"`
-	Price int    `json:"price"`
+	ID    int    `gorm:"primaryKey;autoIncrement" json:"id"`
+	Name  string `gorm:"size:255;not null" json:"name"`
+	Price int    `gorm:"not null" json:"price"`
 }
 
-// Daftar barang (menggunakan slice sebagai array dinamis)
-var items = []Item{
-	{ID: 1, Name: "Laptop", Price: 12000000},
-	{ID: 2, Name: "Smartphone", Price: 8000000},
-	{ID: 3, Name: "Headphones", Price: 200000},
-	{ID: 4, Name: "PS 4", Price: 2500000},
-	{ID: 5, Name: "PS 5", Price: 5500000},
-}
+// Koneksi database
+var db *gorm.DB
 
 // Log aktivitas (menggunakan linked list)
 var activityLog = list.New()
@@ -32,79 +29,73 @@ var activityLog = list.New()
 // Barang terbaru (menggunakan queue dengan linked list)
 var recentItemsQueue = list.New()
 
-// Maksimum barang dalam queue
 const maxRecentItems = 5
 
 // Fungsi menambahkan item ke queue
 func enqueueRecentItem(item Item) {
 	if recentItemsQueue.Len() >= maxRecentItems {
-		recentItemsQueue.Remove(recentItemsQueue.Front()) // Hapus elemen terdepan jika penuh
+		recentItemsQueue.Remove(recentItemsQueue.Front())
 	}
 	recentItemsQueue.PushBack(item)
 }
 
-// Pencarian cepat menggunakan map
-var itemIndex = map[string]int{}
+// Fungsi inisialisasi database
+func initDB() {
+	// Konfigurasi koneksi ke MySQL (XAMPP)
+	dsn := "root:@tcp(127.0.0.1:3306)/db_barang" // Format: user:password@tcp(localhost:port)/database
+	var err error
+	db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	if err != nil {
+		log.Fatalf("Error connecting to the database: %v", err)
+	}
 
-// Inisialisasi indeks item
-func init() {
-	for _, item := range items {
-		itemIndex[strings.ToLower(item.Name)] = item.ID
+	// Membuat tabel jika belum ada
+	err = db.AutoMigrate(&Item{})
+	if err != nil {
+		log.Fatalf("Error migrating database: %v", err)
 	}
 }
 
-// Fungsi pencarian barang (GET)
+// Fungsi pencarian barang berdasarkan nama
 func searchItems(c *gin.Context) {
-	query := strings.TrimSpace(strings.ToLower(c.Query("query")))         // added TrimSpace if theres a space during input the query example " Laptop"
-	if strings.ContainsAny(query, "!@#$%^&*()<>/?;:'\"[]{}\\|+=-_`~,.") { // debugging error
+	query := strings.TrimSpace(strings.ToLower(c.Query("query")))
+	if strings.ContainsAny(query, "!@#$%^&*()<>/?;:'\"[]{}\\|+=-_`~,.") {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid characters in query"})
 		return
 	}
+
 	var results []Item
-	for _, item := range items {
-		if strings.Contains(strings.ToLower(item.Name), query) {
-			results = append(results, item)
-		}
-	}
+	db.Where("LOWER(name) LIKE ?", "%"+query+"%").Find(&results)
+
 	activityLog.PushBack(fmt.Sprintf("Searched item: %s", query))
-	// c.JSON(http.StatusOK, results)
-	c.JSON(http.StatusOK, gin.H{ // added status and query after searching or enter looking for the item name
+	c.JSON(http.StatusOK, gin.H{
 		"query":  query,
 		"status": "success",
 		"data":   results,
 	})
 }
 
+// Fungsi pencarian barang berdasarkan rentang harga
 func searchItemsByPriceRange(c *gin.Context) {
-	// Ambil parameter minPrice dan maxPrice dari query string
 	minPrice, errMin := strconv.Atoi(c.DefaultQuery("minPrice", "0"))
 	maxPrice, errMax := strconv.Atoi(c.DefaultQuery("maxPrice", "0"))
 
-	// Validasi input minPrice dan maxPrice
 	if errMin != nil || errMax != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid price range"})
 		return
 	}
 
-	// Filter barang berdasarkan rentang harga
 	var results []Item
-	for _, item := range items {
-		if item.Price >= minPrice && (maxPrice == 0 || item.Price <= maxPrice) {
-			results = append(results, item)
-		}
-	}
+	db.Where("price >= ? AND (price <= ? OR ? = 0)", minPrice, maxPrice, maxPrice).Find(&results)
 
-	// Catat aktivitas pencarian ke activity log
 	activityLog.PushBack(fmt.Sprintf("Searched items in price range: %d-%d", minPrice, maxPrice))
-
-	// Kembalikan hasil pencarian ke pengguna
 	c.JSON(http.StatusOK, gin.H{
 		"status": "success",
 		"data":   results,
 	})
 }
 
-// Fungsi menambahkan barang baru (POST)
+// Fungsi menambahkan barang baru
 func addItems(c *gin.Context) {
 	var newItems []Item
 	if err := c.ShouldBindJSON(&newItems); err != nil {
@@ -112,21 +103,22 @@ func addItems(c *gin.Context) {
 		return
 	}
 
-	// Mulai ID baru dari panjang slice items + 1
-	nextID := len(items) + 1
-
-	for i := range newItems {
-		if _, exists := itemIndex[strings.ToLower(newItems[i].Name)]; exists {
-			c.JSON(http.StatusConflict, gin.H{"error": "Item with this name already exists"}) // error handling if theres a duplicate data
+	for _, newItem := range newItems {
+		var existing Item
+		if err := db.Where("name = ?", newItem.Name).First(&existing).Error; err == nil {
+			c.JSON(http.StatusConflict, gin.H{"error": fmt.Sprintf("Item with name %s already exists", newItem.Name)})
 			return
 		}
+	}
 
-		newItems[i].ID = nextID
-		items = append(items, newItems[i])
-		itemIndex[strings.ToLower(newItems[i].Name)] = newItems[i].ID // added string.ToLower
-		enqueueRecentItem(newItems[i])
-		activityLog.PushBack(fmt.Sprintf("Added item: %s", newItems[i].Name))
-		nextID++ // Increment ID untuk barang berikutnya
+	if err := db.Create(&newItems).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save items"})
+		return
+	}
+
+	for _, item := range newItems {
+		enqueueRecentItem(item)
+		activityLog.PushBack(fmt.Sprintf("Added item: %s", item.Name))
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
@@ -135,85 +127,72 @@ func addItems(c *gin.Context) {
 	})
 }
 
-// Fungsi menghapus barang berdasarkan ID (DELETE)
+// Fungsi menghapus barang berdasarkan ID
 func deleteItem(c *gin.Context) {
 	idStr := c.Query("id")
-	id, err := strconv.Atoi(idStr) //Atoi parse convert to int
+	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
 		return
 	}
-	var found bool
-	for i, item := range items {
-		if item.ID == id {
-			items = append(items[:i], items[i+1:]...)
-			delete(itemIndex, item.Name)
-			found = true
-			activityLog.PushBack(fmt.Sprintf("Deleted item ID: %d", id))
-			break
-		}
-	}
-	if !found {
+
+	var item Item
+	if err := db.First(&item, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Item not found"})
 		return
 	}
-	// c.Status(http.StatusNoContent)
+
+	if err := db.Delete(&item).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete item"})
+		return
+	}
+
+	activityLog.PushBack(fmt.Sprintf("Deleted item ID: %d", id))
 	c.JSON(http.StatusOK, gin.H{
 		"message":    "Item deleted successfully",
 		"deleted_id": id,
 	})
 }
 
-// Fungsi melihat barang terbaru (GET)
+// Fungsi melihat barang terbaru
 func getRecentItems(c *gin.Context) {
 	var recentItems []Item
-
 	for e := recentItemsQueue.Front(); e != nil; e = e.Next() {
 		item, ok := e.Value.(Item)
-		if !ok {
-			// Respons error jika tipe data salah
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid item in queue"})
-			return
+		if ok {
+			recentItems = append(recentItems, item)
 		}
-		recentItems = append(recentItems, item)
-		// recentItems = append(recentItems, e.Value.(Item)) // error jika dijalankan karena beda tipe)
 	}
-
-	// Kirimkan respons dengan data hasil iterasi
 	c.JSON(http.StatusOK, gin.H{
 		"status": "success",
 		"data":   recentItems,
 	})
 }
 
-// Fungsi melihat log aktivitas (GET)
+// Fungsi melihat log aktivitas
 func getActivityLog(c *gin.Context) {
 	var logs []string
 	for e := activityLog.Front(); e != nil; e = e.Next() {
 		logs = append(logs, e.Value.(string))
 	}
-	c.JSON(http.StatusOK, logs)
+	c.JSON(http.StatusOK, gin.H{
+		"status": "success",
+		"data":   logs,
+	})
 }
 
+// Fungsi utama
 func main() {
+	initDB() // Inisialisasi database
+
 	router := gin.Default()
 
-	// Rute untuk pencarian barang
+	// Rute
 	router.GET("/items/search", searchItems)
-
-	// Rute untuk pencarian berdasarkan rentang harga
 	router.GET("/items/search/price", searchItemsByPriceRange)
-
-	// Rute untuk menambahkan barang baru
 	router.POST("/items", addItems)
-
-	// Rute untuk menghapus barang
 	router.DELETE("/items", deleteItem)
-
-	// Rute untuk melihat barang terbaru
 	router.GET("/items/recent", getRecentItems)
-
-	// Rute untuk melihat log aktivitas
 	router.GET("/activity-log", getActivityLog)
 
 	fmt.Println("Server berjalan di http://localhost:8080")
