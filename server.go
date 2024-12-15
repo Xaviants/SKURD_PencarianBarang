@@ -66,6 +66,35 @@ func searchItems(c *gin.Context) {
 	c.JSON(http.StatusOK, results)
 }
 
+func searchItemsByPriceRange(c *gin.Context) {
+	// Ambil parameter minPrice dan maxPrice dari query string
+	minPrice, errMin := strconv.Atoi(c.DefaultQuery("minPrice", "0"))
+	maxPrice, errMax := strconv.Atoi(c.DefaultQuery("maxPrice", "0"))
+
+	// Validasi input minPrice dan maxPrice
+	if errMin != nil || errMax != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid price range"})
+		return
+	}
+
+	// Filter barang berdasarkan rentang harga
+	var results []Item
+	for _, item := range items {
+		if item.Price >= minPrice && (maxPrice == 0 || item.Price <= maxPrice) {
+			results = append(results, item)
+		}
+	}
+
+	// Catat aktivitas pencarian ke activity log
+	activityLog.PushBack(fmt.Sprintf("Searched items in price range: %d-%d", minPrice, maxPrice))
+
+	// Kembalikan hasil pencarian ke pengguna
+	c.JSON(http.StatusOK, gin.H{
+		"status": "success",
+		"data":   results,
+	})
+}
+
 // Fungsi menambahkan barang baru (POST)
 func addItems(c *gin.Context) {
 	var newItems []Item
@@ -148,6 +177,9 @@ func main() {
 
 	// Rute untuk pencarian barang
 	router.GET("/items/search", searchItems)
+
+	// Rute untuk pencarian berdasarkan rentang harga
+	router.GET("/items/search/price", searchItemsByPriceRange)
 
 	// Rute untuk menambahkan barang baru
 	router.POST("/items", addItems)
