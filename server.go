@@ -49,7 +49,7 @@ var itemIndex = map[string]int{}
 // Inisialisasi indeks item
 func init() {
 	for _, item := range items {
-		itemIndex[item.Name] = item.ID
+		itemIndex[strings.ToLower(item.Name)] = item.ID
 	}
 }
 
@@ -68,31 +68,34 @@ func searchItems(c *gin.Context) {
 
 // Fungsi menambahkan barang baru (POST)
 func addItems(c *gin.Context) {
-    var newItems []Item
-    if err := c.ShouldBindJSON(&newItems); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
-        return
-    }
+	var newItems []Item
+	if err := c.ShouldBindJSON(&newItems); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+		return
+	}
 
-    // Mulai ID baru dari panjang slice items + 1
-    nextID := len(items) + 1
+	// Mulai ID baru dari panjang slice items + 1
+	nextID := len(items) + 1
 
-    for i := range newItems {
-        newItems[i].ID = nextID
-        items = append(items, newItems[i])
-        itemIndex[newItems[i].Name] = newItems[i].ID
-        enqueueRecentItem(newItems[i])
-        activityLog.PushBack(fmt.Sprintf("Added item: %s", newItems[i].Name))
-        nextID++ // Increment ID untuk barang berikutnya
-    }
+	for i := range newItems {
+		if _, exists := itemIndex[strings.ToLower(newItems[i].Name)]; exists {
+			c.JSON(http.StatusConflict, gin.H{"error": "Item with this name already exists"})
+			return
+		}
 
-    c.JSON(http.StatusCreated, gin.H{
-        "message": "Items added successfully",
-        "data":    newItems,
-    })
+		newItems[i].ID = nextID
+		items = append(items, newItems[i])
+		itemIndex[strings.ToLower(newItems[i].Name)] = newItems[i].ID
+		enqueueRecentItem(newItems[i])
+		activityLog.PushBack(fmt.Sprintf("Added item: %s", newItems[i].Name))
+		nextID++ // Increment ID untuk barang berikutnya
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"message": "Items added successfully",
+		"data":    newItems,
+	})
 }
-
-
 
 // Fungsi menghapus barang berdasarkan ID (DELETE)
 func deleteItem(c *gin.Context) {
