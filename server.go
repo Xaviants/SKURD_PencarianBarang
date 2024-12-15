@@ -97,6 +97,14 @@ func searchItemsByPriceRange(c *gin.Context) {
 	var results []Item
 	db.Where("price >= ? AND (price <= ? OR ? = 0)", minPrice, maxPrice, maxPrice).Find(&results)
 
+	if len(results) == 0 {
+		c.JSON(http.StatusNotFound, gin.H{
+			"status": "error",
+			"message": "There's no available item in that range of prices.",
+		})
+		return
+	}
+
 	activityLog.PushBack(fmt.Sprintf("Searched items in price range: %d-%d", minPrice, maxPrice))
 	c.JSON(http.StatusOK, gin.H{
 		"status": "success",
