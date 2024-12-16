@@ -106,7 +106,7 @@ func searchItemsAlphabetically(c *gin.Context) {
 	}
 
 	// Log search item(s) activity
-	activityLog.PushBack(fmt.Sprintf("Searched item by alphabet: %s", query))
+	activityLog.PushBack(fmt.Sprintf("Searched item filtered by alphabet: %s", query))
 	c.JSON(http.StatusOK, gin.H{
 		"query":  query,
 		"status": "success",
@@ -138,7 +138,7 @@ func searchItemsByPriceRange(c *gin.Context) {
 
 	activityLog.PushBack(fmt.Sprintf("Searched items in price range: %d-%d", minPrice, maxPrice))
 	c.JSON(http.StatusOK, gin.H{
-		"message": fmt.Sprintf("Searched items in price range: %d-%d", minPrice, maxPrice),
+		"message": fmt.Sprintf("Searched items filtered in price range: %d-%d", minPrice, maxPrice),
 		"status": "success",
 		"data":   results,
 	})
