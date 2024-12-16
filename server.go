@@ -76,10 +76,41 @@ func searchItems(c *gin.Context) {
 		return
 	}
 
+	// Log search item(s) activity
 	activityLog.PushBack(fmt.Sprintf("Searched item: %s", query))
 	c.JSON(http.StatusOK, gin.H{
 		"query":  query,
 		"status": "success",
+		"data":   results,
+	})
+}
+
+// Function filter searched items by alphabet
+func searchItemsAlphabetically(c *gin.Context) {
+	query := strings.TrimSpace(strings.ToLower(c.Query("query")))
+	if strings.ContainsAny(query, "!@#$%^&*()<>/?;:'\"[]{}\\|+=-_`~,.") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid characters in query"})
+		return
+	}
+
+	var results []Item
+	db.Where("LOWER(name) LIKE ?", "%"+query+"%").Order("name ASC").Find(&results)
+
+	if len(results) == 0 {
+		c.JSON(http.StatusNotFound, gin.H{
+			"query": query,
+			"status": "error",
+			"message": "Item cannot be found",
+		})
+		return
+	}
+
+	// Log search item(s) activity
+	activityLog.PushBack(fmt.Sprintf("Searched item by alphabet: %s", query))
+	c.JSON(http.StatusOK, gin.H{
+		"query":  query,
+		"status": "success",
+		"message": "Searched items filtered by alphabet",
 		"data":   results,
 	})
 }
@@ -107,6 +138,7 @@ func searchItemsByPriceRange(c *gin.Context) {
 
 	activityLog.PushBack(fmt.Sprintf("Searched items in price range: %d-%d", minPrice, maxPrice))
 	c.JSON(http.StatusOK, gin.H{
+		"message": fmt.Sprintf("Searched items in price range: %d-%d", minPrice, maxPrice),
 		"status": "success",
 		"data":   results,
 	})
@@ -207,6 +239,7 @@ func main() {
 	// Rute
 	router.GET("/items/search", searchItems)
 	router.GET("/items/search/price", searchItemsByPriceRange)
+	router.GET("/items/search/alphabetical", searchItemsAlphabetically)
 	router.POST("/items", addItems)
 	router.DELETE("/items", deleteItem)
 	router.GET("/items/recent", getRecentItems)
