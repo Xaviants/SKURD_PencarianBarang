@@ -26,6 +26,9 @@ var db *gorm.DB
 // Log aktivitas (menggunakan linked list)
 var activityLog = list.New()
 
+// Stack undo untuk melacak aksi (menggunakan linked list)
+var undoStack = list.New()
+
 // Barang terbaru (menggunakan queue dengan linked list)
 var recentItemsQueue = list.New()
 
@@ -85,7 +88,7 @@ func searchItems(c *gin.Context) {
 	})
 }
 
-// Function filter searched items by alphabet
+// Fungsi pencarian barang berdasarkan alfabet
 func searchItemsAlphabetically(c *gin.Context) {
 	query := strings.TrimSpace(strings.ToLower(c.Query("query")))
 	if strings.ContainsAny(query, "!@#$%^&*()<>/?;:'\"[]{}\\|+=-_`~,.") {
@@ -165,8 +168,10 @@ func addItems(c *gin.Context) {
 		return
 	}
 
+	// Log undo action for "add"
 	for _, item := range newItems {
 		enqueueRecentItem(item)
+		undoStack.PushBack(map[string]Item{"add": item}) // Push add action to undo stack
 		activityLog.PushBack(fmt.Sprintf("Added item: %s", item.Name))
 	}
 
@@ -196,11 +201,46 @@ func deleteItem(c *gin.Context) {
 		return
 	}
 
+	// Log undo action for "delete"
+	undoStack.PushBack(map[string]Item{"delete": item}) // Push delete action to undo stack
 	activityLog.PushBack(fmt.Sprintf("Deleted item ID: %d", id))
+
 	c.JSON(http.StatusOK, gin.H{
 		"message":    "Item deleted successfully",
 		"deleted_id": id,
 	})
+}
+
+// Fungsi untuk membatalkan aksi terakhir
+func undoLastAction(c *gin.Context) {
+	if undoStack.Len() == 0 {
+		activityLog.PushBack("Undo failed: No actions to undo")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No actions to undo"})
+		return
+	}
+
+	// Ambil aksi terakhir dari stack
+	lastAction := undoStack.Remove(undoStack.Back()).(map[string]Item)
+	for action, item := range lastAction {
+		switch action {
+		case "delete":
+			// Kembalikan item yang dihapus
+			if err := db.Create(&item).Error; err == nil {
+				activityLog.PushBack(fmt.Sprintf("Undo delete: Restored item '%s'", item.Name))
+				c.JSON(http.StatusOK, gin.H{"message": "Undo delete successful", "data": item})
+				return
+			}
+		case "add":
+			// Hapus item yang ditambahkan
+			if err := db.Delete(&item).Error; err == nil {
+				activityLog.PushBack(fmt.Sprintf("Undo add: Removed item '%s'", item.Name))
+				c.JSON(http.StatusOK, gin.H{"message": "Undo add successful", "data": item})
+				return
+			}
+		}
+	}
+	activityLog.PushBack("Undo failed: Unknown error")
+	c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to undo action"})
 }
 
 // Fungsi melihat barang terbaru
@@ -244,6 +284,7 @@ func main() {
 	router.DELETE("/items", deleteItem)
 	router.GET("/items/recent", getRecentItems)
 	router.GET("/activity-log", getActivityLog)
+	router.POST("/undo", undoLastAction)
 
 	fmt.Println("Server berjalan di http://localhost:8080")
 	router.Run(":8080")
