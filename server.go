@@ -72,8 +72,8 @@ func searchItems(c *gin.Context) {
 
 	if len(results) == 0 {
 		c.JSON(http.StatusNotFound, gin.H{
-			"query": query,
-			"status": "error",
+			"query":   query,
+			"status":  "error",
 			"message": "Item cannot be found",
 		})
 		return
@@ -88,35 +88,6 @@ func searchItems(c *gin.Context) {
 	})
 }
 
-// Fungsi pencarian barang berdasarkan alfabet
-func searchItemsAlphabetically(c *gin.Context) {
-	query := strings.TrimSpace(strings.ToLower(c.Query("query")))
-	if strings.ContainsAny(query, "!@#$%^&*()<>/?;:'\"[]{}\\|+=-_`~,.") {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid characters in query"})
-		return
-	}
-
-	var results []Item
-	db.Where("LOWER(name) LIKE ?", "%"+query+"%").Order("name ASC").Find(&results)
-
-	if len(results) == 0 {
-		c.JSON(http.StatusNotFound, gin.H{
-			"query": query,
-			"status": "error",
-			"message": "Item cannot be found",
-		})
-		return
-	}
-
-	// Log search item(s) activity
-	activityLog.PushBack(fmt.Sprintf("Searched item filtered by alphabet: %s", query))
-	c.JSON(http.StatusOK, gin.H{
-		"query":  query,
-		"status": "success",
-		"message": "Searched items filtered by alphabet",
-		"data":   results,
-	})
-}
 
 // Fungsi pencarian barang berdasarkan rentang harga
 func searchItemsByPriceRange(c *gin.Context) {
@@ -133,7 +104,7 @@ func searchItemsByPriceRange(c *gin.Context) {
 
 	if len(results) == 0 {
 		c.JSON(http.StatusNotFound, gin.H{
-			"status": "error",
+			"status":  "error",
 			"message": "There's no available item in that range of prices.",
 		})
 		return
@@ -142,8 +113,8 @@ func searchItemsByPriceRange(c *gin.Context) {
 	activityLog.PushBack(fmt.Sprintf("Searched items in price range: %d-%d", minPrice, maxPrice))
 	c.JSON(http.StatusOK, gin.H{
 		"message": fmt.Sprintf("Searched items filtered in price range: %d-%d", minPrice, maxPrice),
-		"status": "success",
-		"data":   results,
+		"status":  "success",
+		"data":    results,
 	})
 }
 
@@ -279,7 +250,6 @@ func main() {
 	// Rute
 	router.GET("/items/search", searchItems)
 	router.GET("/items/search/price", searchItemsByPriceRange)
-	router.GET("/items/search/alphabetical", searchItemsAlphabetically)
 	router.POST("/items", addItems)
 	router.DELETE("/items", deleteItem)
 	router.GET("/items/recent", getRecentItems)
