@@ -58,6 +58,7 @@ func initDB() {
 		log.Fatalf("Error migrating database: %v", err)
 	}
 }
+ 
 
 // Fungsi pencarian barang berdasarkan nama
 func searchItems(c *gin.Context) {
@@ -128,13 +129,13 @@ func addItems(c *gin.Context) {
 
 	for _, newItem := range newItems {
 		var existing Item
-		if err := db.Where("name = ?", newItem.Name).First(&existing).Error; err == nil {
+		if err := db.Where("name = ?", newItem.Name).First(&existing).Error; err == nil { //exitsting =  barangnya ada aapa engga di database
 			c.JSON(http.StatusConflict, gin.H{"error": fmt.Sprintf("Item with name %s already exists", newItem.Name)})
-			return
+			return //JSON i
 		}
 	}
 
-	if err := db.Create(&newItems).Error; err != nil {
+	if err := db.Create(&newItems).Error; err != nil { 
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save items"})
 		return
 	}
@@ -258,4 +259,5 @@ func main() {
 
 	fmt.Println("Server berjalan di http://localhost:8080")
 	router.Run(":8080")
+	fmt.Println("coba push")
 }
