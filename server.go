@@ -7,9 +7,9 @@ import (
 	"net/http" //server
 	"strconv" // convert
 	"strings" //substring 
-	"github.com/gin-gonic/gin" 
-	"gorm.io/driver/mysql"
-	"gorm.io/gorm" //
+	"github.com/gin-gonic/gin"  // library dri gin
+	"gorm.io/driver/mysql" 
+	"gorm.io/gorm" //fungsi buat nyambung database
 )
 
 // Struct untuk barang
@@ -44,7 +44,7 @@ func enqueueRecentItem(item Item) {
 // Fungsi inisialisasi database
 func initDB() {
 	// Konfigurasi koneksi ke MySQL (XAMPP)
-	dsn := "root:@tcp(127.0.0.1:3306)/db_barang" // Format: user:password@tcp(localhost:port)/database
+	dsn := "root:@tcp(127.0.0.1:3306)/db_barang" // Format: user:password@tcp(localhost:port)/database (tcp = )
 	var err error
 	db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
@@ -58,11 +58,10 @@ func initDB() {
 	}
 }
 
-
-
 // Fungsi pencarian barang berdasarkan nama
 func searchItems(c *gin.Context) {
-	query := strings.TrimSpace(strings.ToLower(c.Query("query")))
+	query := strings.TrimSpace(strings.ToLower(c.Query("query"))) // 
+	 
 	if strings.ContainsAny(query, "!@#$%^&*()<>/?;:'\"[]{}\\|+=-_`~,.") {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid characters in query"})
 		return
