@@ -51,7 +51,7 @@ func initDB() {
 	if err != nil {
 		log.Fatalf("Error connecting to the database: %v", err)
 	}
-
+	
 	// Membuat tabel jika belum ada
 	err = db.AutoMigrate(&Item{})
 	if err != nil {
