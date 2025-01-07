@@ -58,7 +58,6 @@ func initDB() {
 		log.Fatalf("Error migrating database: %v", err)
 	}
 }
- 
 
 // Fungsi pencarian barang berdasarkan nama
 func searchItems(c *gin.Context) {
@@ -88,7 +87,6 @@ func searchItems(c *gin.Context) {
 		"data":   results,
 	})
 }
-
 
 // Fungsi pencarian barang berdasarkan rentang harga
 func searchItemsByPriceRange(c *gin.Context) {
@@ -135,7 +133,7 @@ func addItems(c *gin.Context) {
 		}
 	}
 
-	if err := db.Create(&newItems).Error; err != nil { 
+	if err := db.Create(&newItems).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save items"})
 		return
 	}
@@ -259,4 +257,5 @@ func main() {
 
 	fmt.Println("Server berjalan di http://localhost:8080")
 	router.Run(":8080")
+	fmt.Println("tes tes aja")
 }
