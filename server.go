@@ -4,13 +4,12 @@ import (
 	"container/list"
 	"fmt"
 	"log"
-	"net/http"
-	"strconv"
-	"strings"
-
-	"github.com/gin-gonic/gin"
+	"net/http" //server
+	"strconv" // convert
+	"strings" //substring 
+	"github.com/gin-gonic/gin" 
 	"gorm.io/driver/mysql"
-	"gorm.io/gorm"
+	"gorm.io/gorm" //
 )
 
 // Struct untuk barang
@@ -59,6 +58,8 @@ func initDB() {
 	}
 }
 
+
+
 // Fungsi pencarian barang berdasarkan nama
 func searchItems(c *gin.Context) {
 	query := strings.TrimSpace(strings.ToLower(c.Query("query")))
@@ -78,7 +79,7 @@ func searchItems(c *gin.Context) {
 		})
 		return
 	}
-
+	
 	// Log search item(s) activity
 	activityLog.PushBack(fmt.Sprintf("Searched item: %s", query))
 	c.JSON(http.StatusOK, gin.H{
@@ -257,4 +258,5 @@ func main() {
 
 	fmt.Println("Server berjalan di http://localhost:8080")
 	router.Run(":8080")
+	fmt.Println("tes")
 }
