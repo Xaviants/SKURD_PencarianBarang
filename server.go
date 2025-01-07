@@ -60,7 +60,7 @@ func initDB() {
 
 // Fungsi pencarian barang berdasarkan nama
 func searchItems(c *gin.Context) {
-	query := strings.TrimSpace(strings.ToLower(c.Query("query"))) // 
+	query := strings.TrimSpace(strings.ToLower(c.Query("query"))) 
 	 
 	if strings.ContainsAny(query, "!@#$%^&*()<>/?;:'\"[]{}\\|+=-_`~,.") {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid characters in query"})
@@ -68,7 +68,7 @@ func searchItems(c *gin.Context) {
 	}
 
 	var results []Item
-	db.Where("LOWER(name) LIKE ?", "%"+query+"%").Find(&results)
+	db.Where("LOWER(name) LIKE ?", "%"+query+"%").Find(&results) // buat menyimpan yang udh di cari 
 
 	if len(results) == 0 {
 		c.JSON(http.StatusNotFound, gin.H{
@@ -257,4 +257,5 @@ func main() {
 
 	fmt.Println("Server berjalan di http://localhost:8080")
 	router.Run(":8080")
+	fmt.Println("tes")
 }
