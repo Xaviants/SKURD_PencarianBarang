@@ -257,5 +257,4 @@ func main() {
 
 	fmt.Println("Server berjalan di http://localhost:8080")
 	router.Run(":8080")
-	fmt.Println("tes tes aja")
 }
