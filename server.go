@@ -4,13 +4,12 @@ import (
 	"container/list"
 	"fmt"
 	"log"
-	"net/http"
-	"strconv"
-	"strings"
-
-	"github.com/gin-gonic/gin"
-	"gorm.io/driver/mysql"
-	"gorm.io/gorm"
+	"net/http" //server
+	"strconv" // convert
+	"strings" //substring 
+	"github.com/gin-gonic/gin"  // library dri gin
+	"gorm.io/driver/mysql" 
+	"gorm.io/gorm" //fungsi buat nyambung database
 )
 
 // Struct untuk barang
@@ -45,7 +44,7 @@ func enqueueRecentItem(item Item) {
 // Fungsi inisialisasi database
 func initDB() {
 	// Konfigurasi koneksi ke MySQL (XAMPP)
-	dsn := "root:@tcp(127.0.0.1:3306)/db_barang" // Format: user:password@tcp(localhost:port)/database
+	dsn := "root:@tcp(127.0.0.1:3306)/db_barang" // Format: user:password@tcp(localhost:port)/database (tcp = )
 	var err error
 	db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
@@ -58,18 +57,18 @@ func initDB() {
 		log.Fatalf("Error migrating database: %v", err)
 	}
 }
- 
 
 // Fungsi pencarian barang berdasarkan nama
 func searchItems(c *gin.Context) {
-	query := strings.TrimSpace(strings.ToLower(c.Query("query")))
+	query := strings.TrimSpace(strings.ToLower(c.Query("query"))) 
+	 
 	if strings.ContainsAny(query, "!@#$%^&*()<>/?;:'\"[]{}\\|+=-_`~,.") {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid characters in query"})
 		return
 	}
 
 	var results []Item
-	db.Where("LOWER(name) LIKE ?", "%"+query+"%").Find(&results)
+	db.Where("LOWER(name) LIKE ?", "%"+query+"%").Find(&results) // buat menyimpan yang udh di cari 
 
 	if len(results) == 0 {
 		c.JSON(http.StatusNotFound, gin.H{
@@ -79,7 +78,7 @@ func searchItems(c *gin.Context) {
 		})
 		return
 	}
-
+	
 	// Log search item(s) activity
 	activityLog.PushBack(fmt.Sprintf("Searched item: %s", query))
 	c.JSON(http.StatusOK, gin.H{
@@ -88,7 +87,6 @@ func searchItems(c *gin.Context) {
 		"data":   results,
 	})
 }
-
 
 // Fungsi pencarian barang berdasarkan rentang harga
 func searchItemsByPriceRange(c *gin.Context) {
@@ -135,7 +133,7 @@ func addItems(c *gin.Context) {
 		}
 	}
 
-	if err := db.Create(&newItems).Error; err != nil { 
+	if err := db.Create(&newItems).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save items"})
 		return
 	}
@@ -259,4 +257,5 @@ func main() {
 
 	fmt.Println("Server berjalan di http://localhost:8080")
 	router.Run(":8080")
+	fmt.Println("tes")
 }
